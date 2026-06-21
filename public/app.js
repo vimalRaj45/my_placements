@@ -1303,9 +1303,19 @@ async function downloadFile(fileId) {
   try {
     const res = await apiFetch(`/api/files/${fileId}/download-url`);
     if (res && res.signed_get_url) {
-      // Direct opening/downloading in browser via pre-signed GET URL
-      window.open(res.signed_get_url, '_blank');
-      showToast('Redirected to R2 download link');
+      // Use an invisible anchor click — bypasses popup blockers completely
+      const a = document.createElement('a');
+      a.href = res.signed_get_url;
+      // Use the original filename stored in the label field
+      a.download = res.file ? res.file.label : 'download';
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showToast('Download started!');
+    } else {
+      showToast('Could not fetch file download link', 'error');
     }
   } catch (err) {
     showToast('Could not fetch file download link', 'error');

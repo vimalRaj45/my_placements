@@ -1,7 +1,9 @@
 const pdfParse = require('pdf-parse');
+const officeParser = require('officeparser');
+const { createWorker } = require('tesseract.js');
 const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
 const db = require('../db');
-
+const os = require('os');
 const fs = require('fs');
 const path = require('path');
 
@@ -27,57 +29,142 @@ function streamToBuffer(stream) {
   });
 }
 
-// Helper: get text content from file key in R2
+// Helper: extract text from Office documents via officeparser
+async function extractOfficeText(buffer, ext) {
+  return new Promise((resolve, reject) => {
+    officeParser.parseOffice(buffer, (text, err) => {
+      if (err) return reject(err);
+      resolve(text || '');
+    }, { outputErrorToConsole: false });
+  });
+}
+
+// Helper: OCR an image buffer via Tesseract.js
+async function extractImageOCR(buffer, ext) {
+  // Write buffer to a temp file because Tesseract.js needs a file path or URL
+  const tmpFile = path.join(os.tmpdir(), `ocr_tmp_${Date.now()}${ext}`);
+  fs.writeFileSync(tmpFile, buffer);
+  try {
+    const worker = await createWorker('eng');
+    const { data: { text } } = await worker.recognize(tmpFile);
+    await worker.terminate();
+    return text || '[No text detected in image]';
+  } finally {
+    try { fs.unlinkSync(tmpFile); } catch (_) {}
+  }
+}
+
+// Universal helper: get text content from any file stored in R2
 async function getFileTextContent(r2_key, mime_type) {
   try {
-    let buffer;
     const command = new GetObjectCommand({
       Bucket: r2Bucket,
       Key: r2_key,
     });
     const s3Response = await s3.send(command);
-    buffer = await streamToBuffer(s3Response.Body);
+    const buffer = await streamToBuffer(s3Response.Body);
 
-    if (mime_type === 'application/pdf' || r2_key.toLowerCase().endsWith('.pdf')) {
+    // Derive extension from the R2 key
+    const ext = path.extname(r2_key).toLowerCase();
+
+    // --- PDF ---
+    if (ext === '.pdf' || mime_type === 'application/pdf') {
       const parsed = await pdfParse(buffer);
-      return parsed.text;
-    } else {
+      return parsed.text || '[PDF extracted but no text found]';
+    }
+
+    // --- Office documents ---
+    if (['.docx', '.pptx', '.xlsx', '.odt', '.odp', '.ods'].includes(ext)) {
+      try {
+        return await extractOfficeText(buffer, ext);
+      } catch (officeErr) {
+        console.warn('officeparser failed, falling back to plain text:', officeErr.message);
+        return buffer.toString('utf-8');
+      }
+    }
+
+    // --- Plain text / code / data ---
+    if (['.txt', '.md', '.csv', '.json', '.xml', '.html', '.js', '.py', '.java', '.ts'].includes(ext)) {
       return buffer.toString('utf-8');
     }
+
+    // --- Images → OCR ---
+    if (['.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tif', '.tiff'].includes(ext)
+        || (mime_type && mime_type.startsWith('image/'))) {
+      return await extractImageOCR(buffer, ext || '.png');
+    }
+
+    // --- Fallback: try UTF-8, give up gracefully ---
+    const textAttempt = buffer.toString('utf-8');
+    // Heuristic: if more than 20% non-printable chars it's binary
+    const nonPrintable = (textAttempt.match(/[\x00-\x08\x0E-\x1F\x7F-\x9F]/g) || []).length;
+    if (nonPrintable / textAttempt.length > 0.2) {
+      return `[Binary file (${ext || mime_type || 'unknown type'}) — text extraction not supported for this format]`;
+    }
+    return textAttempt;
+
   } catch (err) {
     console.error('Error fetching file text content:', err);
     throw new Error(`Could not fetch or parse file from storage: ${err.message}`);
   }
 }
 
-// Helper: Call Mistral API
+// Helper: Sleep utility
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Helper: Call Mistral API with retry logic for 429 Rate Limits
 async function callMistral(messages, temperature = 0.7) {
   const apiKey = process.env.MISTRAL_API_KEY;
   if (!apiKey) {
     throw new Error('Mistral API Key is missing.');
   }
 
-  const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'mistral-large-latest',
-      messages,
-      temperature
-    })
-  });
+  const maxRetries = 4;
+  let delay = 1000; // start with 1 second delay
 
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`Mistral API returned status ${response.status}: ${errorBody}`);
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'mistral-large-latest',
+          messages,
+          temperature
+        })
+      });
+
+      if (response.status === 429) {
+        if (attempt === maxRetries) {
+          throw new Error(`Mistral API returned status 429 (Rate Limit Exceeded) after ${maxRetries} attempts.`);
+        }
+        console.warn(`[Mistral API] Rate limited (429). Retrying attempt ${attempt}/${maxRetries} in ${delay}ms...`);
+        await sleep(delay);
+        delay *= 2.5; // exponential backoff with factor 2.5
+        continue;
+      }
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`Mistral API returned status ${response.status}: ${errorBody}`);
+      }
+
+      const data = await response.json();
+      return data.choices[0].message.content;
+    } catch (err) {
+      if (attempt === maxRetries || !err.message.includes('429')) {
+        throw err;
+      }
+      console.warn(`[Mistral API] Error on attempt ${attempt}/${maxRetries}: ${err.message}. Retrying in ${delay}ms...`);
+      await sleep(delay);
+      delay *= 2.5;
+    }
   }
-
-  const data = await response.json();
-  return data.choices[0].message.content;
 }
+
 
 async function agentRoutes(fastify, options) {
   // POST /api/agent/resume-review

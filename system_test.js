@@ -6,7 +6,7 @@ const { ImapFlow } = require('imapflow');
 dotenv.config();
 
 const BASE_URL = 'http://localhost:3000';
-const DEFAULT_PASSWORD = 'rrzu iydo mncy bjsg';
+const DEFAULT_PASSWORD = process.env.TEST_PASSWORD || 'Vimalboss@45';
 
 console.log('==================================================');
 console.log('      PLACEMENT PREP HUB - FULL SYSTEM TESTS      ');
