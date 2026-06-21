@@ -1,0 +1,167 @@
+/* Design Aesthetics Overrides & Token Utilities */
+
+/* 60-30-10 Color Scheme System applied via Tailwind and standard definitions */
+:root {
+  --font-sans: 'Outfit', 'Inter', sans-serif;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+/* Custom scrollbar styled with slate transitions */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1; /* slate-300 */
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8; /* slate-400 */
+}
+
+/* Sidebar navigation buttons custom state tracking */
+.nav-btn {
+  color: #94a3b8; /* slate-400 */
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.nav-btn:hover {
+  background-color: #1e293b; /* slate-800 */
+  color: #f8fafc; /* slate-50 */
+}
+.nav-btn.active {
+  background-color: #2563eb; /* blue-600 */
+  color: #ffffff;
+  box-shadow: 0 4px 12px -2px rgba(37, 99, 235, 0.2);
+}
+
+/* Kanban card interactions */
+.kanban-card {
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  cursor: grab;
+}
+.kanban-card:active {
+  cursor: grabbing;
+}
+.kanban-card:hover {
+  transform: translateY(-2px);
+  border-color: #bfdbfe; /* blue-200 */
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+}
+
+/* Kanban drag & drop column highlights */
+.kanban-column {
+  transition: background-color 0.2s ease;
+}
+.kanban-column.drag-over {
+  background-color: #dbeafe !important; /* blue-100 */
+}
+
+/* Agent chat bubble styling */
+.agent-bubble-user {
+  background-color: #2563eb;
+  color: white;
+  border-radius: 18px 18px 4px 18px;
+  box-shadow: 0 4px 10px -2px rgba(37, 99, 235, 0.15);
+}
+
+.agent-bubble-bot {
+  background-color: #ffffff;
+  color: #1e293b;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px 18px 18px 4px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+}
+
+/* Markdown parsing adjustments */
+.markdown-content p {
+  margin-bottom: 0.75rem;
+  line-height: 1.6;
+}
+.markdown-content p:last-child {
+  margin-bottom: 0;
+}
+.markdown-content ul, .markdown-content ol {
+  margin-left: 1.25rem;
+  margin-bottom: 0.75rem;
+  list-style-type: disc;
+}
+.markdown-content ol {
+  list-style-type: decimal;
+}
+.markdown-content li {
+  margin-bottom: 0.25rem;
+}
+.markdown-content strong {
+  font-weight: 600;
+  color: #0f172a; /* slate-900 */
+}
+.markdown-content h1, .markdown-content h2, .markdown-content h3, .markdown-content h4 {
+  font-weight: 700;
+  color: #0f172a;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+.markdown-content h1 { font-size: 1.25rem; }
+.markdown-content h2 { font-size: 1.15rem; }
+.markdown-content h3 { font-size: 1.05rem; }
+.markdown-content code {
+  font-family: monospace;
+  background-color: #f1f5f9;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  color: #dc2626; /* red-600 */
+}
+.markdown-content pre {
+  background-color: #0f172a;
+  color: #f8fafc;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  margin: 0.75rem 0;
+}
+.markdown-content pre code {
+  background-color: transparent;
+  color: inherit;
+  padding: 0;
+  font-size: inherit;
+}
+
+/* Agent tool button highlights */
+.agent-tool-btn {
+  color: #64748b; /* slate-500 */
+  border: 1px solid #f1f5f9;
+  transition: all 0.2s;
+}
+.agent-tool-btn:hover {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+.agent-tool-btn.active {
+  background-color: #eff6ff; /* blue-50 */
+  color: #2563eb;
+  border-color: #bfdbfe;
+  font-weight: 600;
+}
+
+/* Keyframe animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Toast notifications */
+.toast-msg {
+  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

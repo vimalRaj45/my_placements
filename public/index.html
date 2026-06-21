@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Placement Prep Platform</title>
+  <!-- Google Fonts: Inter & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Bootstrap Icons CDN -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <!-- Marked.js for Markdown parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Outfit', 'Inter', 'sans-serif'],
+          },
+        },
+      },
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="h-full text-slate-800 flex flex-col font-sans overflow-hidden">
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Loading Overlay -->
+  <div id="global-loading" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-white px-6 py-4 rounded-xl shadow-xl flex items-center gap-3 border border-slate-100">
+      <div class="animate-spin text-blue-600 text-2xl"><i class="bi bi-arrow-repeat"></i></div>
+      <span class="font-medium text-slate-700" id="global-loading-text">Syncing with storage...</span>
+    </div>
+  </div>
+
+  <!-- LOGIN PAGE VIEW -->
+  <div id="login-view" class="h-full flex items-center justify-center p-4 bg-slate-900 text-white select-none hidden">
+    <div class="w-full max-w-md bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700/50 flex flex-col gap-6">
+      <div class="text-center flex flex-col gap-2">
+        <div class="mx-auto w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 text-white text-2xl font-bold">
+          <i class="bi bi-rocket-takeoff-fill"></i>
+        </div>
+        <h1 class="text-2xl font-bold tracking-tight mt-2">Placement Prep Hub</h1>
+        <p class="text-slate-400 text-sm">Enter your single placement key to log in</p>
+      </div>
+
+      <form id="login-form" class="flex flex-col gap-4">
+        <div>
+          <label for="password" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Password</label>
+          <input type="password" id="password" required placeholder="••••••••••••••••"
+            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition">
+        </div>
+        <div id="login-error" class="text-red-400 text-sm font-medium hidden flex items-center gap-1.5">
+          <i class="bi bi-exclamation-triangle"></i> <span id="login-error-msg">Invalid password</span>
+        </div>
+        <button type="submit"
+          class="w-full bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-medium rounded-xl py-3 shadow-lg shadow-blue-600/10 transition mt-2 flex items-center justify-center gap-2">
+          <span>Access Workspace</span> <i class="bi bi-chevron-right"></i>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MAIN WORKSPACE VIEW (Dashboard Layout) -->
+  <div id="workspace-view" class="h-full flex hidden overflow-hidden">
+    
+    <!-- Sidebar Backdrop Overlay for Mobile -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 hidden md:hidden"></div>
+
+    <!-- SIDE NAVIGATION BAR -->
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 border-r border-slate-800 text-slate-300 flex flex-col shrink-0 transform -translate-x-full transition-transform duration-300 ease-in-out md:translate-x-0 md:relative md:flex">
+      
+      <!-- Profile / Header -->
+      <div class="p-6 flex items-center justify-between border-b border-slate-800">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg text-white font-bold text-xl">
+            <i class="bi bi-rocket-takeoff-fill"></i>
+          </div>
+          <div>
+            <h2 class="font-bold text-white leading-tight">Vimal Raj</h2>
+            <span class="text-xs text-slate-400">Prep Workspace</span>
+          </div>
+        </div>
+        <button id="close-sidebar-btn" class="p-1.5 text-slate-400 hover:text-white focus:outline-none md:hidden text-xl" aria-label="Close sidebar">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+
+      <!-- Navigation Links -->
+      <nav class="flex-1 px-4 py-6 flex flex-col gap-1 overflow-y-auto">
+        <button data-tab="dashboard" class="nav-btn active flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition text-left">
+          <i class="bi bi-grid-1x2-fill"></i> <span>Dashboard</span>
+        </button>
+        <button data-tab="pipeline" class="nav-btn flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition text-left">
+          <i class="bi bi-kanban-fill"></i> <span>Kanban Pipeline</span>
+        </button>
+        <button data-tab="notes" class="nav-btn flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition text-left">
+          <i class="bi bi-file-earmark-text-fill"></i> <span>Notes / Journals</span>
+        </button>
+        <button data-tab="resources" class="nav-btn flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition text-left">
+          <i class="bi bi-cloud-arrow-up-fill"></i> <span>File Resources</span>
+        </button>
+        <button data-tab="agent" class="nav-btn flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition text-left">
+          <i class="bi bi-robot"></i> <span>AI Agent Prep</span>
+        </button>
+        <button data-tab="inbox" class="nav-btn flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition text-left relative">
+          <i class="bi bi-envelope-fill"></i> <span>Job Inbox</span>
+          <span id="inbox-badge" class="absolute right-4 bg-blue-600 text-white font-bold text-[10px] px-1.5 py-0.5 rounded-full hidden">0</span>
+        </button>
+      </nav>
+
+      <!-- Sidebar Footer -->
+      <div class="p-4 border-t border-slate-800 flex flex-col gap-3">
+        <!-- Gmail status -->
+        <div class="bg-slate-800/40 p-3 rounded-xl border border-slate-800 flex flex-col gap-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-400">Gmail IMAP</span>
+            <span id="gmail-status-dot" class="flex items-center gap-1.5 text-red-400">
+              <span class="w-2.5 h-2.5 rounded-full bg-red-400"></span> Off
+            </span>
+          </div>
+          <button id="sync-emails-btn" class="w-full bg-slate-800 hover:bg-slate-700 active:scale-[0.97] text-white text-xs font-semibold py-2 rounded-lg border border-slate-700 transition flex items-center justify-center gap-1.5">
+            <i class="bi bi-arrow-repeat"></i> Sync Mailbox
+          </button>
+        </div>
+
+        <button id="logout-btn" class="w-full text-slate-400 hover:text-white flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition text-left">
+          <i class="bi bi-box-arrow-left"></i> <span>Sign Out</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- CONTENT AREA -->
+    <main class="flex-1 flex flex-col min-w-0 bg-slate-50 relative overflow-hidden">
+      
+      <!-- TOP UTILITY BAR -->
+      <header class="h-16 border-b border-slate-200 bg-white flex items-center justify-between px-4 md:px-8 shrink-0">
+        <div class="flex items-center gap-3">
+          <button id="mobile-menu-toggle" class="p-1.5 text-slate-600 hover:text-slate-900 focus:outline-none md:hidden text-2xl" aria-label="Open menu">
+            <i class="bi bi-list"></i>
+          </button>
+          <h2 id="view-title" class="text-lg font-semibold text-slate-800">Dashboard</h2>
+        </div>
+
+        <!-- Global Smart Search -->
+        <div class="flex-1 max-w-md mx-4 md:mx-8 hidden sm:block relative cursor-pointer" onclick="openSearchModal()">
+          <div class="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
+            <i class="bi bi-search"></i>
+          </div>
+          <input type="text" readonly placeholder="Type '/' to search resumes, notes, applications..."
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-9 pr-4 text-xs focus:outline-none text-slate-400 select-none cursor-pointer hover:border-slate-300 hover:bg-slate-100/50 transition">
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button id="mobile-search-btn" class="sm:hidden p-1.5 text-slate-600 hover:text-slate-900 text-xl focus:outline-none" onclick="openSearchModal()" aria-label="Search">
+            <i class="bi bi-search"></i>
+          </button>
+          <button id="global-add-company" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-xl shadow-md shadow-blue-600/10 flex items-center gap-1.5 transition">
+            <i class="bi bi-plus-lg"></i> <span class="hidden sm:inline">Add Application</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- VIEWPORT PANELS CONTAINER -->
+      <div id="viewport" class="flex-1 overflow-y-auto p-4 md:p-8">
+        
+        <!-- DASHBOARD VIEW -->
+        <section id="dashboard-section" class="tab-panel flex flex-col gap-6 md:gap-8 hidden">
+          <!-- Overview stats -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            <div class="bg-white p-4 md:p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+              <div>
+                <span class="text-slate-400 text-xs font-semibold uppercase tracking-wider">Applied</span>
+                <h3 class="text-2xl md:text-3xl font-bold mt-1 text-slate-800" id="stat-applied">0</h3>
+              </div>
+              <div class="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 text-lg md:text-xl">
+                <i class="bi bi-send-fill"></i>
+              </div>
+            </div>
+            <div class="bg-white p-4 md:p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+              <div>
+                <span class="text-slate-400 text-xs font-semibold uppercase tracking-wider font-semibold">Interviewing</span>
+                <h3 class="text-2xl md:text-3xl font-bold mt-1 text-blue-600" id="stat-interview">0</h3>
+              </div>
+              <div class="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 text-lg md:text-xl">
+                <i class="bi bi-calendar2-range-fill"></i>
+              </div>
+            </div>
+            <div class="bg-white p-4 md:p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+              <div>
+                <span class="text-slate-400 text-xs font-semibold uppercase tracking-wider">Offers Received</span>
+                <h3 class="text-2xl md:text-3xl font-bold mt-1 text-emerald-600" id="stat-offer">0</h3>
+              </div>
+              <div class="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 text-lg md:text-xl">
+                <i class="bi bi-award-fill"></i>
+              </div>
+            </div>
+            <div class="bg-white p-4 md:p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+              <div>
+                <span class="text-slate-400 text-xs font-semibold uppercase tracking-wider">Rejected</span>
+                <h3 class="text-2xl md:text-3xl font-bold mt-1 text-rose-600" id="stat-rejected">0</h3>
+              </div>
+              <div class="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600 text-lg md:text-xl">
+                <i class="bi bi-x-circle-fill"></i>
+              </div>
+            </div>
+          </div>
+ 
+          <!-- Quick summary blocks -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+            
+            <!-- Upcoming rounds -->
+            <div class="bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col lg:col-span-2">
+              <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+                <h4 class="font-bold text-slate-800 flex items-center gap-2">
+                  <i class="bi bi-clock-history text-blue-600"></i> Upcoming Interview Rounds
+                </h4>
+                <span class="text-xs text-slate-400">Next 48 Hours</span>
+              </div>
+              <div class="divide-y divide-slate-100 overflow-y-auto max-h-[350px] flex-1" id="dash-upcoming-rounds">
+                <!-- Loaded dynamically -->
+                <div class="p-6 text-center text-slate-400 text-sm">
+                  No upcoming interview rounds scheduled.
+                </div>
+              </div>
+            </div>
+
+            <!-- Recent Notes -->
+            <div class="bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col">
+              <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+                <h4 class="font-bold text-slate-800 flex items-center gap-2">
+                  <i class="bi bi-journal-text text-blue-600"></i> Recent Notes
+                </h4>
+                <button class="text-xs font-semibold text-blue-600 hover:text-blue-700" onclick="switchTab('notes')">View All</button>
+              </div>
+              <div class="divide-y divide-slate-100 overflow-y-auto max-h-[350px] flex-1" id="dash-recent-notes">
+                <!-- Loaded dynamically -->
+                <div class="p-6 text-center text-slate-400 text-sm">
+                  No notes recorded yet.
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- PIPELINE / KANBAN VIEW -->
+        <section id="pipeline-section" class="tab-panel hidden h-full flex flex-col gap-6 overflow-hidden pb-8">
+          <div class="flex-1 flex md:grid md:grid-cols-4 gap-4 md:gap-6 overflow-x-auto md:overflow-x-visible pb-4 h-full min-h-0">
+            <!-- Columns: Applied, Interview, Offer, Rejected -->
+            
+            <!-- APPLIED COLUMN -->
+            <div class="w-80 md:w-auto shrink-0 bg-slate-100/70 rounded-2xl flex flex-col border border-slate-200/50 overflow-hidden h-full min-h-0">
+              <div class="p-4 border-b border-slate-200 flex items-center justify-between shrink-0 bg-white">
+                <div class="flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                  <h4 class="font-bold text-sm uppercase tracking-wider text-slate-700">Applied</h4>
+                </div>
+                <span class="bg-slate-100 text-slate-600 text-xs font-bold px-2 py-0.5 rounded-full column-count" id="count-applied">0</span>
+              </div>
+              <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-3 kanban-column min-h-[150px]" data-status="applied" id="column-applied">
+                <!-- cards loaded dynamically -->
+              </div>
+            </div>
+ 
+            <!-- INTERVIEW COLUMN -->
+            <div class="w-80 md:w-auto shrink-0 bg-slate-100/70 rounded-2xl flex flex-col border border-slate-200/50 overflow-hidden h-full min-h-0">
+              <div class="p-4 border-b border-slate-200 flex items-center justify-between shrink-0 bg-white">
+                <div class="flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                  <h4 class="font-bold text-sm uppercase tracking-wider text-slate-700">Interview</h4>
+                </div>
+                <span class="bg-blue-50 text-blue-600 text-xs font-bold px-2 py-0.5 rounded-full column-count" id="count-interview">0</span>
+              </div>
+              <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-3 kanban-column min-h-[150px]" data-status="interview" id="column-interview">
+                <!-- cards loaded dynamically -->
+              </div>
+            </div>
+ 
+            <!-- OFFER COLUMN -->
+            <div class="w-80 md:w-auto shrink-0 bg-slate-100/70 rounded-2xl flex flex-col border border-slate-200/50 overflow-hidden h-full min-h-0">
+              <div class="p-4 border-b border-slate-200 flex items-center justify-between shrink-0 bg-white">
+                <div class="flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                  <h4 class="font-bold text-sm uppercase tracking-wider text-slate-700">Offer</h4>
+                </div>
+                <span class="bg-emerald-50 text-emerald-600 text-xs font-bold px-2 py-0.5 rounded-full column-count" id="count-offer">0</span>
+              </div>
+              <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-3 kanban-column min-h-[150px]" data-status="offer" id="column-offer">
+                <!-- cards loaded dynamically -->
+              </div>
+            </div>
+ 
+            <!-- REJECTED COLUMN -->
+            <div class="w-80 md:w-auto shrink-0 bg-slate-100/70 rounded-2xl flex flex-col border border-slate-200/50 overflow-hidden h-full min-h-0">
+              <div class="p-4 border-b border-slate-200 flex items-center justify-between shrink-0 bg-white">
+                <div class="flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                  <h4 class="font-bold text-sm uppercase tracking-wider text-slate-700">Rejected</h4>
+                </div>
+                <span class="bg-rose-50 text-rose-600 text-xs font-bold px-2 py-0.5 rounded-full column-count" id="count-rejected">0</span>
+              </div>
+              <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-3 kanban-column min-h-[150px]" data-status="rejected" id="column-rejected">
+                <!-- cards loaded dynamically -->
+              </div>
+            </div>
+ 
+          </div>
+        </section>
+
+        <!-- NOTES VIEW -->
+        <section id="notes-section" class="tab-panel hidden flex flex-col gap-6">
+          <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <label for="filter-note-company" class="text-xs font-bold text-slate-500 uppercase tracking-wider">Filter by Company:</label>
+              <select id="filter-note-company" class="bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500">
+                <option value="">All Notes</option>
+                <option value="null">General Notes Only</option>
+                <!-- Filled dynamically -->
+              </select>
+            </div>
+            <button id="add-note-btn" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-xl shadow-md transition flex items-center gap-1.5">
+              <i class="bi bi-pencil-square"></i> New Note
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="notes-list-container">
+            <!-- Notes loaded dynamically -->
+          </div>
+        </section>
+
+        <!-- FILE RESOURCES VIEW -->
+        <section id="resources-section" class="tab-panel hidden flex flex-col gap-8">
+          
+          <!-- Upload Widget -->
+          <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-4">
+            <h4 class="font-bold text-slate-800 flex items-center gap-2">
+              <i class="bi bi-cloud-arrow-up text-blue-600"></i> Store New Document (Cloudflare R2)
+            </h4>
+            <form id="upload-file-form" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+              <div>
+                <label for="upload-file-input" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Select File</label>
+                <input type="file" id="upload-file-input" required
+                  class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-sm focus:outline-none text-slate-600">
+              </div>
+              <div>
+                <label for="upload-file-type" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Document Type</label>
+                <select id="upload-file-type" required
+                  class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                  <option value="resume">Resume</option>
+                  <option value="certificate">Certificate</option>
+                  <option value="offer_letter">Offer Letter</option>
+                  <option value="resource">Study Resource</option>
+                  <option value="other">Other File</option>
+                </select>
+              </div>
+              <div>
+                <label for="upload-file-company" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Link Company (Optional)</label>
+                <select id="upload-file-company"
+                  class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                  <option value="">None</option>
+                  <!-- Filled dynamically -->
+                </select>
+              </div>
+              <div>
+                <label for="upload-file-folder" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Folder (Optional)</label>
+                <input type="text" id="upload-file-folder" placeholder="e.g. Resumes, DSA Sheets"
+                  class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500 text-slate-700">
+              </div>
+              <div class="flex items-center gap-4">
+                <label class="flex items-center gap-2 cursor-pointer py-2">
+                  <input type="checkbox" id="upload-file-shared" class="rounded text-blue-600 focus:ring-blue-500 w-4 h-4">
+                  <span class="text-xs font-semibold text-slate-600 uppercase tracking-wider">Share in Hub</span>
+                </label>
+                <button type="submit"
+                  class="flex-grow bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2.5 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-1.5">
+                  <i class="bi bi-upload"></i> Upload
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Tabs: My Documents vs Study Hub -->
+          <div class="flex flex-col gap-6">
+            <div class="border-b border-slate-200">
+              <nav class="flex gap-6">
+                <button id="file-tab-my" class="border-b-2 border-blue-600 pb-4 text-sm font-semibold text-blue-600 select-none">
+                  My Storage Portfolio
+                </button>
+                <button id="file-tab-shared" class="border-b-2 border-transparent pb-4 text-sm font-semibold text-slate-500 hover:text-slate-800 select-none">
+                  Study Resource Hub (Shared)
+                </button>
+              </nav>
+            </div>
+
+            <!-- Documents table -->
+            <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="bg-slate-50 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100">
+                      <th class="p-4 pl-6">Label / Name</th>
+                      <th class="p-4">Type</th>
+                      <th class="p-4">Linked Company</th>
+                      <th class="p-4">Size</th>
+                      <th class="p-4 text-right pr-6">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="files-table-body" class="divide-y divide-slate-100">
+                    <!-- Loaded dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- AI AGENT PREP VIEW -->
+        <section id="agent-section" class="tab-panel hidden flex flex-col lg:flex-row gap-6 md:gap-8 lg:h-full lg:min-h-0 lg:overflow-hidden pb-8">
+          
+          <!-- Agent Controls/Tabs (Left) -->
+          <div class="w-full lg:w-80 flex flex-col gap-6 shrink-0 lg:h-full lg:overflow-y-auto pb-4">
+            <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-3">
+              <h4 class="font-bold text-slate-800 flex items-center gap-2">
+                <i class="bi bi-robot text-blue-600"></i> Mistral Prep Agent
+              </h4>
+              <p class="text-xs text-slate-500 leading-relaxed">Choose an assistant tool to optimize your portfolio and master your interviews.</p>
+              
+              <div class="flex flex-col gap-2 mt-2">
+                <button id="agent-tool-review" class="agent-tool-btn active flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm text-left transition">
+                  <i class="bi bi-file-earmark-diff"></i> Resume Analyzer
+                </button>
+                <button id="agent-tool-mock" class="agent-tool-btn flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm text-left transition">
+                  <i class="bi bi-chat-dots-fill"></i> Mock Interviewer
+                </button>
+                <button id="agent-tool-prep" class="agent-tool-btn flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm text-left transition">
+                  <i class="bi bi-journal-code"></i> Aptitude & Coding Tutor
+                </button>
+                <button id="agent-tool-chat" class="agent-tool-btn flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm text-left transition">
+                  <i class="bi bi-chat-square-text-fill"></i> General Career Coach
+                </button>
+
+              </div>
+            </div>
+ 
+            <!-- Context Info panels based on tool -->
+            <div id="agent-context-panel" class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex-1 flex flex-col gap-4 overflow-y-auto">
+              <!-- Content changes dynamically depending on active tool -->
+            </div>
+          </div>
+ 
+          <!-- Agent Chat/Output Area (Right) -->
+          <div class="flex-1 bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col overflow-hidden min-h-[450px] lg:h-full lg:min-h-0">
+            <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
+              <div class="flex items-center gap-2">
+                <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+                <span class="text-xs font-semibold text-slate-600 uppercase tracking-wider" id="agent-header-title">Resume Analyzer</span>
+              </div>
+              <button id="clear-agent-chat-btn" class="text-xs font-semibold text-slate-500 hover:text-rose-600 transition flex items-center gap-1">
+                <i class="bi bi-trash"></i> Reset Chat
+              </button>
+            </div>
+
+            <!-- Conversation Display -->
+            <div id="agent-chat-history" class="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
+              <!-- Messages -->
+            </div>
+
+            <!-- Input area -->
+            <div id="agent-input-container" class="p-4 border-t border-slate-100 shrink-0">
+              <!-- Content dynamically rendered -->
+            </div>
+          </div>
+        </section>
+
+        <!-- EMAIL INBOX VIEW -->
+        <section id="inbox-section" class="tab-panel hidden flex flex-col gap-6">
+          <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h4 class="font-bold text-slate-800 flex items-center gap-2">
+                <i class="bi bi-filter-square text-blue-600"></i> Filtered Job Communications
+              </h4>
+              <p class="text-xs text-slate-500 leading-relaxed mt-1">This inbox only displays job application related updates classified by your filters and AI fallback.</p>
+            </div>
+            <button id="inbox-sync-btn" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-md transition flex items-center gap-1.5">
+              <i class="bi bi-arrow-repeat"></i> Sync Gmail Now
+            </button>
+          </div>
+
+          <div class="flex flex-col gap-4" id="inbox-list">
+            <!-- Loaded dynamically -->
+          </div>
+        </section>
+
+        <!-- COMPANY DETAILS VIEW -->
+        <section id="company-detail-section" class="tab-panel hidden flex flex-col gap-8">
+          <button id="detail-back-btn" class="self-start text-sm font-semibold text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
+            <i class="bi bi-arrow-left"></i> Back to Workspace
+          </button>
+
+          <!-- Company Header Info -->
+          <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div class="flex items-center gap-4">
+              <div id="detail-logo-placeholder" class="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-3xl">
+                G
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <h3 class="text-2xl font-bold text-slate-800" id="detail-company-name">Google</h3>
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-slate-500">
+                  <span id="detail-role"><i class="bi bi-briefcase"></i> Software Engineer</span>
+                  <span id="detail-package"><i class="bi bi-cash-coin"></i> $120,000 / year</span>
+                  <span id="detail-location"><i class="bi bi-geo-alt"></i> Mountain View, CA</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+              <select id="detail-status" class="bg-slate-50 border border-slate-200 text-sm font-semibold rounded-xl px-4 py-2 focus:outline-none focus:border-blue-500">
+                <option value="applied">Applied</option>
+                <option value="interview">Interview</option>
+                <option value="offer">Offer</option>
+                <option value="rejected">Rejected</option>
+              </select>
+              <button id="edit-company-btn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold px-4 py-2 rounded-xl transition">
+                Edit Details
+              </button>
+              <button id="delete-company-btn" class="bg-rose-50 hover:bg-rose-100 text-rose-600 text-sm font-semibold px-4 py-2 rounded-xl transition">
+                Delete Application
+              </button>
+            </div>
+          </div>
+
+          <!-- Rounds, Notes, Files Grid -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Left Side: Interview Rounds -->
+            <div class="lg:col-span-2 flex flex-col gap-6">
+              
+              <!-- Rounds widget -->
+              <div class="bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col">
+                <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+                  <h4 class="font-bold text-slate-800 flex items-center gap-2">
+                    <i class="bi bi-calendar2-range text-blue-600"></i> Interview Rounds
+                  </h4>
+                  <button id="add-round-btn" class="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                    <i class="bi bi-plus-lg"></i> Add Round
+                  </button>
+                </div>
+                <div class="divide-y divide-slate-100" id="detail-rounds-list">
+                  <!-- Loaded dynamically -->
+                </div>
+              </div>
+
+              <!-- Linked Notes widget -->
+              <div class="bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col">
+                <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+                  <h4 class="font-bold text-slate-800 flex items-center gap-2">
+                    <i class="bi bi-journal-text text-blue-600"></i> Linked Notes / Journal
+                  </h4>
+                  <button id="add-linked-note-btn" class="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                    <i class="bi bi-pencil-square"></i> New Note
+                  </button>
+                </div>
+                <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4" id="detail-notes-list">
+                  <!-- Loaded dynamically -->
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Right Side: Files / Resumes Used -->
+            <div class="bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col h-fit">
+              <div class="p-6 border-b border-slate-100">
+                <h4 class="font-bold text-slate-800 flex items-center gap-2">
+                  <i class="bi bi-file-earmark-pdf text-blue-600"></i> Linked Documents
+                </h4>
+              </div>
+              <div class="p-6 flex flex-col gap-4">
+                <!-- Mini upload -->
+                <div class="border border-dashed border-slate-200 rounded-xl p-4 flex flex-col gap-3">
+                  <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Link file to this process</span>
+                  <input type="file" id="company-detail-file-input" class="text-xs text-slate-600">
+                  <select id="company-detail-file-type" class="bg-slate-50 border border-slate-200 text-xs rounded-lg p-1.5 focus:outline-none">
+                    <option value="resume">Resume Used</option>
+                    <option value="offer_letter">Offer Letter</option>
+                    <option value="certificate">Certificate</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <button id="company-detail-file-upload-btn" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-1.5 rounded-lg transition">
+                    Upload & Link
+                  </button>
+                </div>
+
+                <div class="flex flex-col gap-3 mt-2" id="detail-files-list">
+                  <!-- Loaded dynamically -->
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- Add/Edit Company Modal -->
+  <div id="company-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 flex items-center justify-center hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md border border-slate-100 flex flex-col overflow-hidden animate-fade-in p-6 gap-5 mx-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 id="company-modal-title" class="font-bold text-lg text-slate-800">Add Application</h3>
+        <button class="text-slate-400 hover:text-slate-600 text-xl" onclick="closeModal('company-modal')">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+
+      <form id="company-form" class="flex flex-col gap-4">
+        <input type="hidden" id="company-id-input">
+        <div>
+          <label for="company-name-input" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Company Name *</label>
+          <input type="text" id="company-name-input" required placeholder="e.g. Google"
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition">
+        </div>
+        <div>
+          <label for="company-role-input" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Role / Position</label>
+          <input type="text" id="company-role-input" placeholder="e.g. SDE Intern"
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition">
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="company-status-input" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Status</label>
+            <select id="company-status-input"
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition">
+              <option value="applied">Applied</option>
+              <option value="interview">Interview</option>
+              <option value="offer">Offer</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+          <div>
+            <label for="company-date-input" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Applied Date</label>
+            <input type="date" id="company-date-input"
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-blue-500 transition">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="company-package-input" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Package / Salary</label>
+            <input type="text" id="company-package-input" placeholder="e.g. 15 LPA or $80k"
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition">
+          </div>
+          <div>
+            <label for="company-location-input" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Location</label>
+            <input type="text" id="company-location-input" placeholder="e.g. Remote / Bangalore"
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition">
+          </div>
+        </div>
+
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition mt-2 shadow-lg shadow-blue-600/10">
+          Save Application
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add/Edit Round Modal -->
+  <div id="round-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 flex items-center justify-center hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md border border-slate-100 flex flex-col overflow-hidden p-6 gap-5 mx-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 id="round-modal-title" class="font-bold text-lg text-slate-800">Add Interview Round</h3>
+        <button class="text-slate-400 hover:text-slate-600 text-xl" onclick="closeModal('round-modal')">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+
+      <form id="round-form" class="flex flex-col gap-4">
+        <input type="hidden" id="round-id-input">
+        <input type="hidden" id="round-company-id-input">
+        <div>
+          <label for="round-name-input" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Round Name *</label>
+          <input type="text" id="round-name-input" required placeholder="e.g. OA, Technical 1, System Design, HR"
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition">
+        </div>
+        <div>
+          <label for="round-date-input" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Scheduled Date & Time</label>
+          <input type="datetime-local" id="round-date-input"
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-blue-500 transition">
+        </div>
+        <div>
+          <label for="round-result-input" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Result</label>
+          <select id="round-result-input"
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition">
+            <option value="pending">Pending</option>
+            <option value="passed">Passed</option>
+            <option value="failed">Failed</option>
+          </select>
+        </div>
+        <div>
+          <label for="round-feedback-input" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Feedback / Notes</label>
+          <textarea id="round-feedback-input" rows="3" placeholder="Brief details about the questions asked, difficulty, etc."
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition resize-none"></textarea>
+        </div>
+
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition mt-2 shadow-lg">
+          Save Round
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add/Edit Note Modal -->
+  <div id="note-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 flex items-center justify-center hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg border border-slate-100 flex flex-col overflow-hidden p-6 gap-5 mx-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 id="note-modal-title" class="font-bold text-lg text-slate-800">New Preparation Note</h3>
+        <button class="text-slate-400 hover:text-slate-600 text-xl" onclick="closeModal('note-modal')">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+
+      <form id="note-form" class="flex flex-col gap-4">
+        <input type="hidden" id="note-id-input">
+        <div>
+          <label for="note-title-input" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Title</label>
+          <input type="text" id="note-title-input" placeholder="e.g. DSA Heap implementation notes"
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition">
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="note-company-input" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Link Company</label>
+            <select id="note-company-input"
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition">
+              <option value="">None (General)</option>
+              <!-- Filled dynamically -->
+            </select>
+          </div>
+          <div>
+            <label for="note-round-input" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Link Round (Optional)</label>
+            <select id="note-round-input"
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition">
+              <option value="">None</option>
+              <!-- Filled dynamically -->
+            </select>
+          </div>
+        </div>
+        <div>
+          <label for="note-content-input" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Content (Markdown supported) *</label>
+          <textarea id="note-content-input" required rows="8" placeholder="Type your notes in markdown here..."
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition font-mono"></textarea>
+        </div>
+
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition mt-2 shadow-lg">
+          Save Note
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit File Modal -->
+  <div id="file-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 flex items-center justify-center hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md border border-slate-100 flex flex-col overflow-hidden p-6 gap-5 animate-fade-in mx-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 class="font-bold text-lg text-slate-800">Edit Document Details</h3>
+        <button class="text-slate-400 hover:text-slate-600 text-xl" onclick="closeModal('file-modal')">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+
+      <form id="file-edit-form" class="flex flex-col gap-4">
+        <input type="hidden" id="file-id-input">
+        <div>
+          <label for="file-label-input" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">File Name / Label *</label>
+          <input type="text" id="file-label-input" required placeholder="e.g. Resume_Google.pdf"
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition">
+        </div>
+        <div>
+          <label for="file-type-input" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Document Type</label>
+          <select id="file-type-input" required
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition">
+            <option value="resume">Resume</option>
+            <option value="certificate">Certificate</option>
+            <option value="offer_letter">Offer Letter</option>
+            <option value="resource">Study Resource</option>
+            <option value="other">Other File</option>
+          </select>
+        </div>
+        <div>
+          <label for="file-company-input" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Link Company</label>
+          <select id="file-company-input"
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition">
+            <option value="">None</option>
+            <!-- Filled dynamically -->
+          </select>
+        </div>
+        <div>
+          <label for="file-folder-input" class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Folder / Group (Optional)</label>
+          <input type="text" id="file-folder-input" placeholder="e.g. Resumes, DSA Sheets"
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition text-slate-700">
+        </div>
+        <div>
+          <label class="flex items-center gap-2 cursor-pointer py-1">
+            <input type="checkbox" id="file-shared-input" class="rounded text-blue-600 focus:ring-blue-500 w-4 h-4">
+            <span class="text-xs font-semibold text-slate-600 uppercase tracking-wider">Share in Resource Hub</span>
+          </label>
+        </div>
+
+
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition mt-2 shadow-lg shadow-blue-600/10">
+          Save Document Details
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Spotlight Search Modal -->
+  <div id="search-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center hidden" onclick="event.target.id === 'search-modal' && closeModal('search-modal')">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl border border-slate-100 flex flex-col overflow-hidden max-h-[80vh] mx-4 animate-fade-in">
+      
+      <!-- Search Header -->
+      <div class="p-4 border-b border-slate-100 flex items-center gap-3 bg-slate-50">
+        <i class="bi bi-search text-slate-400 text-lg"></i>
+        <input type="text" id="modal-search-input" placeholder="Search applications, notes, resumes, emails..."
+          class="flex-1 bg-transparent text-slate-800 text-base focus:outline-none placeholder-slate-400 font-sans">
+        <button class="text-slate-400 hover:text-slate-600 text-xs font-semibold border border-slate-200 rounded px-1.5 py-0.5" onclick="closeModal('search-modal')">
+          ESC
+        </button>
+      </div>
+
+      <!-- Search Results Container -->
+      <div id="search-results-content" class="flex-1 overflow-y-auto p-4 flex flex-col gap-6">
+        <!-- Default State -->
+        <div id="search-default-state" class="text-slate-400 text-center py-12 flex flex-col items-center gap-2">
+          <i class="bi bi-compass text-3xl text-slate-300"></i>
+          <p class="text-sm font-bold text-slate-600">Search Prep Workspace</p>
+          <p class="text-xs text-slate-400">Search for files by folder, notes by content, companies by role/status, or emails by sender.</p>
+        </div>
+
+        <!-- Results List -->
+        <div id="search-results-list" class="flex flex-col gap-6 hidden">
+          <!-- Companies -->
+          <div id="search-sec-companies" class="flex flex-col gap-2">
+            <h5 class="text-xs font-bold text-slate-400 uppercase tracking-wider pl-2 flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
+              <i class="bi bi-kanban"></i> Applications
+            </h5>
+            <div class="search-group flex flex-col gap-1"></div>
+          </div>
+
+          <!-- Notes -->
+          <div id="search-sec-notes" class="flex flex-col gap-2">
+            <h5 class="text-xs font-bold text-slate-400 uppercase tracking-wider pl-2 flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
+              <i class="bi bi-file-earmark-text"></i> Notes / Journals
+            </h5>
+            <div class="search-group flex flex-col gap-1 font-sans"></div>
+          </div>
+
+          <!-- Files -->
+          <div id="search-sec-files" class="flex flex-col gap-2">
+            <h5 class="text-xs font-bold text-slate-400 uppercase tracking-wider pl-2 flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
+              <i class="bi bi-folder-fill"></i> Files & Folders
+            </h5>
+            <div class="search-group flex flex-col gap-1"></div>
+          </div>
+
+          <!-- Emails -->
+          <div id="search-sec-emails" class="flex flex-col gap-2">
+            <h5 class="text-xs font-bold text-slate-400 uppercase tracking-wider pl-2 flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
+              <i class="bi bi-envelope"></i> Job Inbox Emails
+            </h5>
+            <div class="search-group flex flex-col gap-1"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Client-side SPA Script -->
+  <script src="/app.js"></script>
+</body>
+</html>
+
