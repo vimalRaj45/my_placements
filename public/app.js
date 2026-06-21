@@ -1240,6 +1240,7 @@ function closeModal(modalId) {
 // Pre-signed direct PUT uploads to Cloudflare R2
 async function performFileUpload(file, type, companyId = null, isShared = false, folder = null) {
   showLoading(`Requesting signed R2 upload path for: ${file.name}...`);
+  let res = null;
   try {
     // 1. Get signed PUT URL from Fastify
     const payload = {
@@ -1253,7 +1254,7 @@ async function performFileUpload(file, type, companyId = null, isShared = false,
     };
 
 
-    const res = await apiFetch('/api/files/upload-url', {
+    res = await apiFetch('/api/files/upload-url', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -1283,6 +1284,13 @@ async function performFileUpload(file, type, companyId = null, isShared = false,
       renderCompanyDetails(state.activeCompanyId);
     }
   } catch (err) {
+    if (res && res.file_id) {
+      try {
+        await apiFetch(`/api/files/${res.file_id}`, { method: 'DELETE' });
+      } catch (delErr) {
+        console.error('Failed to clean up file record after failed upload:', delErr);
+      }
+    }
     showToast(`Upload failed: ${err.message}`, 'error');
   } finally {
     hideLoading();
