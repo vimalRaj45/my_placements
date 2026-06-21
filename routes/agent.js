@@ -54,6 +54,71 @@ async function extractImageOCR(buffer, ext) {
   }
 }
 
+// Helper: Extract relevant chunks from massive documents using keyword scoring to prevent context limit errors
+function getRelevantChunks(text, query = '', maxChars = 120000) {
+  if (!text) return '';
+  if (text.length <= maxChars) return text;
+
+  // Split query into keywords (lowercase, alphanumeric, longer than 2 chars)
+  const keywords = (query || '')
+    .toLowerCase()
+    .replace(/[^\w\s]/g, '')
+    .split(/\s+/)
+    .filter(w => w.length > 2);
+
+  // If no keywords found, default to first maxChars characters
+  if (keywords.length === 0) {
+    return text.substring(0, maxChars) + '\n\n... [Remaining content truncated to fit context limits]';
+  }
+
+  const chunkSize = 8000;
+  const overlap = 1000;
+  const chunks = [];
+  
+  for (let i = 0; i < text.length; i += (chunkSize - overlap)) {
+    chunks.push(text.substring(i, i + chunkSize));
+  }
+
+  // Score each chunk
+  const scoredChunks = chunks.map((chunk, index) => {
+    const lowerChunk = chunk.toLowerCase();
+    let score = 0;
+    for (const word of keywords) {
+      try {
+        const regex = new RegExp(word.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g');
+        const matches = lowerChunk.match(regex);
+        if (matches) {
+          score += matches.length;
+        }
+      } catch (_) {}
+    }
+    return { chunk, score, index };
+  });
+
+  // Sort by score descending, then by original index ascending
+  scoredChunks.sort((a, b) => b.score - a.score || a.index - b.index);
+
+  // Take top chunks until we hit maxChars limit
+  let assembledLength = 0;
+  const selectedChunks = [];
+  
+  for (const item of scoredChunks) {
+    if ((assembledLength + item.chunk.length) > maxChars) {
+      if (selectedChunks.length === 0) {
+        selectedChunks.push({ chunk: item.chunk.substring(0, maxChars), index: item.index });
+      }
+      break;
+    }
+    selectedChunks.push(item);
+    assembledLength += item.chunk.length;
+  }
+
+  // Sort selected chunks back to chronological order to keep text readable
+  selectedChunks.sort((a, b) => a.index - b.index);
+  
+  return selectedChunks.map(c => `[Excerpt (from section ${c.index + 1})]:\n${c.chunk}`).join('\n\n---\n\n') + '\n\n... [Some sections omitted to fit context limits]';
+}
+
 // Universal helper: get text content from any file stored in R2
 async function getFileTextContent(r2_key, mime_type) {
   try {
@@ -308,7 +373,8 @@ Your goals are:
           const file = dbRes.rows[0];
           try {
             const fileText = await getFileTextContent(file.r2_key, file.mime_type);
-            fileContext = `[Context File: "${file.label}"]\n${fileText}\n\n`;
+            const chunkedText = getRelevantChunks(fileText, message);
+            fileContext = `[Context File: "${file.label}"]\n${chunkedText}\n\n`;
           } catch (fileErr) {
             fastify.log.warn(`Could not extract context from file ID ${file_id}: ${fileErr.message}`);
           }
@@ -369,7 +435,8 @@ Be concise, clear, and professional. Provide code snippets or markdown tables wh
           const file = dbRes.rows[0];
           try {
             const fileText = await getFileTextContent(file.r2_key, file.mime_type);
-            fileContext = `[Context File: "${file.label}"]\n${fileText}\n\n`;
+            const chunkedText = getRelevantChunks(fileText, message);
+            fileContext = `[Context File: "${file.label}"]\n${chunkedText}\n\n`;
           } catch (fileErr) {
             fastify.log.warn(`Could not extract context from file ID ${file_id}: ${fileErr.message}`);
           }
